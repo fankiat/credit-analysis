@@ -1,7 +1,7 @@
 ---
-title: "Title of Analysis Goes Here"
-author: "Your Name (netid@illinois.edu)"
-date: "Insert Date Here"
+title: "Kaggle's Credit Card Fraud Detection Analysis"
+author: "Fan Kiat Chan (fchan5@illinois.edu)"
+date: "May 5, 2021"
 output:
   html_document: 
     theme: default
@@ -14,16 +14,21 @@ knitr::opts_chunk$set(echo = FALSE, fig.align = 'center')
 
 ```{r, load-packages, include = FALSE}
 # load packages
+library("tidyverse")
+library("caret")
+library("corrplot")
+library("rpart.plot")
+library("ROSE")
 ```
 
 ```{r make-data, warning = FALSE, message = FALSE}
 # read data and subset
-source("make-data.R")
+# source("make-data.R")
 ```
 
 ```{r read-full-data, warning = FALSE, message = FALSE}
 # read full data
-cc = data.table::fread("data/cc.csv.gz")
+# cc = data.table::fread("data/cc.csv.gz")
 ```
 
 ```{r read-subset-data, warning = FALSE, message = FALSE}
@@ -35,42 +40,191 @@ cc_sub = data.table::fread("data/cc-sub.csv")
 
 ## Abstract
 
-> Abstract text goes here.
+The goal of this analysis is to use available data for creating a detection tool for credit card frauds. Data was first transformed to remedy the issue of data imbalance. Different modeling approaches are then explored, compared and analyzed. The results show good accuracies on training dataset for the different models, where further evaluation performed on the test data using the simplest model (decision tree) present accurate predictions as well.
 
 ***
 
 ## Introduction
 
-Write your introduction here.
+This analysis attempts to seek a reasonable model using available data for detecting credit card fraud. Since countless transactions happen over credit card payments daily, it is important that credit card companies are able to keep track of these transactions and to recognize fraudulent activities quickly so that customers are not charged for items they did not purchase.
+We note here that this is an exercise in the context of materials learned in a course ([STAT432](https://stat432.org/) @ [UIUC](https://illinois.edu/)), and the models and results presented here are not, under any circumstances, a conclusive claim on the existence of a fraudulent activity. Please consult your credit card representative if you suspect any fraudulent activity on your credit statements.
 
 ***
 
 ## Methods
 
-Describe the methods used in this section.
+Here we describe the data used and how it is processed before fitting to a few models for analysis.
 
 ### Data
+We will be using the [Kaggle Credit Card Fraud Detection](https://www.kaggle.com/mlg-ulb/creditcardfraud) for our analysis.
+The data can be downloaded using the `make-data.R` script, which will create the data file in `data/cc-sub.csv`.
+We can then load and take a quick look at the data.
 
-Specifically describe the data and how it is used here.
+```{r echo = TRUE}
+# cc_sub = read_csv("data/cc-sub.csv", col_types = cols())
+cc_sub = data.table::fread("data/cc-sub.csv")
+cc_sub
+```
+We can see that the data is stored as a tibble of size 10,000 x 31. Each row of the tibble contains a sample data for an individual, each with 31 features represented by the columns. The meanings of each feature are as below:
+
+- `V1`, `V2`, ... `V28` - the principal components obtained with PCA (original features and background information about the data is not provided due to confidentiality issues)
+- `Time` - seconds elapsed between each transaction and the first transaction in the dataset
+- `Amount` - transaction amount
+- `Class` - transaction label either as `fraud` (positive) or `genuine` (negative)
+
+We then perform test-train split on the data and check for any missing values in the training data.
+```{r echo=TRUE, warning=FALSE}
+# test-train split the data
+set.seed(42)
+trn_idx = createDataPartition(cc_sub$Class, p = 0.80, list = FALSE)
+cc_trn = cc_sub[trn_idx, ]
+cc_tst = cc_sub[-trn_idx, ]
+
+# function to determine proportion of NAs in a vector
+na_prop = function(x) {
+  mean(is.na(x))
+}
+
+# check proportion of NAs in each column
+sapply(cc_trn, na_prop)
+```
+Fortunately, we do not see any missing data. We need to further coerce the `Class` response variable as factors so as to facilitate the classification modeling later.
+```{r echo = FALSE}
+cc_trn$Class = factor(cc_trn$Class)
+cc_tst$Class = factor(cc_tst$Class)
+```
+
+Taking a quick look at the training data, we quickly realize that the dataset is extremely unbalanced.
+```{r echo = TRUE}
+prop.table(table(cc_trn$Class))
+```
+Considering the proportions of the data classified as `fraud`, using a classifier that always detect no fraudulent activity would be 99.85% accurate. This indicates that the sensitivity to false negative is low, and signals that mean accuracy is not a good measure for the performance of the developed model. Instead we could look at other measures such as sensitivity and specificity as well as measuring the area under the receiver operating characteristic (ROC) curve.
+
+To remedy this, we can transform the data and create samples via random sampling to possibly balance the data set. Here we use over-sampling minority (`fraud`) data to generate a sampled data that is balanced.
+
+```{r echo = TRUE}
+set.seed(42)
+cc_trn_sampled = ovun.sample(
+  Class ~ .,
+  data = cc_trn,
+  method = "over",
+  N = length(cc_trn$Class) * 2)$data
+cc_trn_sampled$Class <- relevel(cc_trn_sampled$Class, "fraud")
+# Check data proportion now
+prop.table(table(cc_trn_sampled$Class))
+```
+
+The data now looks more balanced.
+We can further look into the correlations between different feature variables and response variable.
+```{r echo=TRUE, warning=FALSE}
+cc_corr_viz = cc_trn_sampled
+cc_corr_viz$Class = ifelse(cc_corr_viz$Class == "genuine", 1, 0)
+corr_plot = corrplot(cor(cc_corr_viz[,-1]), method = "circle", type = "upper")
+```
+
+Looking at the correlations between `Class` and other feature variables, we see that there is a strong correlation with `V14`, `V12`, `V10` and `V9`. We should keep an eye on these variables later when we look at the models.
 
 ### Modeling
 
-Discuss your modeling and validation strategy here.
+In our modeling, we will be using the 5-fold cross-validation approach for
+
+- decision tree
+- k-nearest neigbours
+- random forest
+
+```{r echo=TRUE}
+# cross-validation with decision tree, knn and random forest
+cv_5 = trainControl(method = "cv",
+                    number = 5,
+                    )
+
+# try with decision tree
+cc_tree_mod = train(
+  form = Class ~ .,
+  data = cc_trn_sampled,
+  method = "rpart",
+  trControl = cv_5,
+  tuneLength = 5
+)
+
+# try with knn
+cc_knn_mod = train(
+  form = Class ~ .,
+  data = cc_trn_sampled,
+  method = "knn",
+  trControl = cv_5,
+  tuneLength = 5
+)
+
+# try with random forest
+cc_rf_mod = train(
+  form = Class ~ .,
+  data = cc_trn_sampled,
+  method = "rf",
+  trControl = cv_5,
+  tuneLength = 5,
+  verbose = FALSE
+)
+```
+
+For brevity, we include final best model settings for each of these approaches in the appendix. Instead, we focus next on some metrics for evaluating the performance of these models, where we first compare the accuracies and the confusion matrices for these models.
+
 
 ***
 
 ## Results
 
-State your results here.
+Looking at the confusion matrices, we see that overall the models perform well, with knn showing some false positive predictions. 
+```{r echo = TRUE}
+confusionMatrix(cc_tree_mod)
+confusionMatrix(cc_knn_mod)
+confusionMatrix(cc_rf_mod)
+```
+
+When looking at the ROC curves, we see that the area under the curve is close to 1 for all of these models.
+```{r echo = TRUE}
+pred_tree = predict(cc_tree_mod, cc_trn_sampled, method = "class")
+pred_knn = predict(cc_knn_mod, cc_trn_sampled, method = "class")
+pred_rf = predict(cc_rf_mod, cc_trn_sampled, method = "class")
+
+roc.curve(cc_trn_sampled$Class, pred_tree, plotit = TRUE)
+roc.curve(cc_trn_sampled$Class, pred_knn, plotit = TRUE)
+roc.curve(cc_trn_sampled$Class, pred_rf, plotit = TRUE)
+```
 
 ***
 
 ## Discussion
 
-Discuss your results here.
+Considering the similar performance of these models, we pick the decision tree model as our best model for testing. This is motivated by the simplicity of the model. It takes much less time to train and also prove to be simple to use by just following the flow of the decision tree chart as below.
+
+```{r}
+rpart.plot(cc_tree_mod$finalModel)
+```
+
+We further highlight the decision tree looks at two features: `V14` and `V10`, which is consistent with the observation of strong correlations between these features and the response variable `Class` as shown in the chart before.
+
+Further evaluation of the decision tree model on a few other metrics (sensitivity, specificity, etc.) and ROC curve using the testing data shows the following results.
+
+```{r echo = TRUE}
+# test accuracy
+pred_tst = predict(cc_tree_mod, cc_tst, method = "class")
+roc.curve(cc_tst$Class, pred_tst, plotit = TRUE)
+confusionMatrix(data = pred_tst, reference = cc_tst$Class)
+```
+
+As we can see from the ROC curve, the area under the curve is 1. The sensitivity is 1.0, which indicate that the model correctly predicts all existing frauds in the testing dataset. A disclaimer here though is that the samples marked as `fraud` (positive class) is extremely low due to sample imbalance. The specificity is 0.9995, which is still quite good, since detecting `genuine` activity as `fraud` (at a very low rate too!) is most likely acceptable, since it is better to be safe than sorry.
+
+Overall, we have presented a few models that could be use to detect credit card frauds with good accuracy given the available unbalanced dataset, with decision tree chosen as our desired model given its simplicity in training and deployment. Future improvements that can be incorporated in the model development include taking a deeper look into feature variables that show strong correlations with response variable as highlighted above, and perhaps consult a financial professional for deciding which model, given the limitations, better augments the fraudulent detection pipeline. More balanced data set should also be used for fitting these models.
 
 ***
 
 ## Appendix
 
-Place potential additional information here.
+Below we show the optimal settings for each model used.
+```{r echo = TRUE}
+cc_tree_mod
+cc_knn_mod
+cc_rf_mod
+
+```
