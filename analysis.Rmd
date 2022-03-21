@@ -3,9 +3,10 @@ title: "Kaggle's Credit Card Fraud Detection Analysis"
 author: "Fan Kiat Chan (fchan5@illinois.edu)"
 date: "May 5, 2021"
 output:
-  html_document: 
-    theme: default
-    toc: yes
+  github_document
+  # html_document: 
+  #   theme: default
+  #   toc: yes
 ---
 
 ```{r, setup, include = FALSE}
@@ -47,7 +48,7 @@ The goal of this analysis is to use available data for creating a detection tool
 ## Introduction
 
 This analysis attempts to seek a reasonable model using available data for detecting credit card fraud. Since countless transactions happen over credit card payments daily, it is important that credit card companies are able to keep track of these transactions and to recognize fraudulent activities quickly so that customers are not charged for items they did not purchase.
-We note here that this is an exercise in the context of materials learned in a course ([STAT432](https://stat432.org/) @ [UIUC](https://illinois.edu/)), and the models and results presented here are not, under any circumstances, a conclusive claim on the existence of a fraudulent activity. Please consult your credit card representative if you suspect any fraudulent activity on your credit statements.
+We note here that this is an exercise, and the models and results presented here are not, under any circumstances, a conclusive claim on the existence of a fraudulent activity. Please consult your credit card representative if you suspect any fraudulent activity on your credit statements.
 
 ***
 

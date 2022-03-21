@@ -1,12 +1,13 @@
 # Kaggle's Credit Card Fraud Detection Analysis
 
-This repository contains the files necessary to get started with the Credit Card Fraud Detection data set from [Kaggle](https://www.kaggle.com/) for analysis in [STAT 432](https://stat432.org/) at the [University of Illinois at Urbana-Champaign](https://illinois.edu/).
+This repository contains the files necessary to get started with the Credit Card Fraud Detection data set from [Kaggle](https://www.kaggle.com/) for analysis. The details of the analysis can be found in `analysis.md`.
 
 ## Files and Directories
 
 - `README.md`: The file that you are reading that describes the analysis and data provided.
 - `make-data.R`: The R script used to scrape and wrangle the data.
-- `analysis.Rmd`: A **template** R Markdown file to be used for reporting the results of your analysis.
+- `analysis.Rmd`: The R Markdown file used for reporting the results of the analysis.
+- `analysis.md`: The Markdown file containing the results of the analysis.
 - `data-raw/creditcard.csv.zip`: The original data downloaded from Kaggle and zipped.
 - `credit-analysis.Rproj`: An RStudio project file.
 
@@ -29,4 +30,4 @@ The goal of this analysis is to use the provided data in order to create tool th
 
 The `Class` variable indicates whether or not a transaction is genuine or fraud. In the original data, these were encoded as `0` and `1` respectively. In the processed data contained in the `data` folder, these have been changed to `genuine` and `fraud` to avoid any confusion.
 
-Because the "full" data is somewhat larger, for the purpose of completing a data analysis for STAT 432, you may simply work with a subset of the data, but consider taking on the challenge of trying to use the full data with whatever limited computational resources you have available.
+Because the "full" data is somewhat larger, for the purpose of completing this exercise, we simply work with a subset of the data, but consider taking on the challenge of trying to use the full data with whatever limited computational resources you have available.
